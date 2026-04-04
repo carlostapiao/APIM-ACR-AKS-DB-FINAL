@@ -116,7 +116,7 @@
           
 #           echo "Despliegue de Carlos Tapia completado con éxito."
 
-name: 'CI/CD Lab 21 - Final Tapia'
+name: 'CI/CD - Final'
 
 on:
   push:
@@ -124,45 +124,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ==========================================
-  # ETAPA 1: CI (Continuous Integration)
-  # Objetivo: Construir la imagen y subirla al ACR
-  # ==========================================
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Login to ACR
-        uses: azure/docker-login@v1
-        with:
-          login-server: acrcarlos69lmv3.azurecr.io
-          username: ${{ secrets.AZURE_CLIENT_ID }}
-          password: ${{ secrets.AZURE_CLIENT_SECRET }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build & Push App
-        uses: docker/build-push-action@v5
-        with:
-          context: ./app
-          push: true
-          tags: acrcarlos69lmv3.azurecr.io/support-app:${{ github.sha }}
-
-  # ==========================================
-  # ETAPA 2: CD (Continuous Deployment)
-  # Objetivo: Infraestructura, Base de Datos y K8s
-  # ==========================================
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build # <--- ESTO UNE EL CI CON EL CD
     env:
       # --- Credenciales para Terraform ---
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -170,7 +133,7 @@ jobs:
       ARM_SUBSCRIPTION_ID: "e690edad-0257-4dec-b4c9-08e163433edb"
       ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       
-      # --- Parámetros de Base de Datos ---
+      # --- Parámetros de Infraestructura ---
       DB_SERVER_NAME: "sql-server-tickets-carlos"
       DB_NAME: "SupportDB"
       DB_USER: "sqladmin"
@@ -188,7 +151,10 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 1. Infraestructura con Terraform
+      # ============================================================
+      # PASO 1: LEVANTAR TODA LA INFRAESTRUCTURA (ACR, AKS, SQL, APIM)
+      # Esto garantiza que el ACR exista ANTES de intentar el Push.
+      # ============================================================
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -199,10 +165,36 @@ jobs:
           terraform init
           terraform apply -auto-approve
 
-      # 2. Configuración de Base de Datos (Tablas)
+      # Espera de seguridad para propagación de DNS del ACR
+      - name: Wait for ACR DNS
+        run: sleep 30
+
+      # ============================================================
+      # PASO 2: CI - CONSTRUIR Y SUBIR IMAGEN AL ACR
+      # Ahora que Terraform confirmó que el ACR existe, subimos la app.
+      # ============================================================
+      - name: Login to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: acrcarlos69lmv3.azurecr.io
+          username: ${{ secrets.AZURE_CLIENT_ID }}
+          password: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push App
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          push: true
+          tags: acrcarlos69lmv3.azurecr.io/support-app:${{ github.sha }}
+
+      # ============================================================
+      # PASO 3: CONFIGURAR BASE DE DATOS
+      # ============================================================
       - name: Create SQL Table
         run: |
-          echo "Verificando estructura de base de datos..."
           sqlcmd -S "${{ env.DB_SERVER_NAME }}.database.windows.net" \
                  -d "${{ env.DB_NAME }}" \
                  -U "${{ env.DB_USER }}" \
@@ -217,22 +209,25 @@ jobs:
                         fecha_creacion DATETIME DEFAULT GETDATE()
                      );"
 
-      # 3. Despliegue en Kubernetes (AKS)
+      # ============================================================
+      # PASO 4: CD - DESPLIEGUE EN AKS
+      # ============================================================
       - name: Get AKS Context
         run: |
           az aks get-credentials --resource-group rg-k8s-lab --name aks-labv3 --overwrite-existing
 
       - name: Kubernetes Deploy
         run: |
-          # Actualizar imagen con el hash dinámico del commit actual
+          # Actualizar el YAML con el hash del commit actual
           sed -i 's|acrcarlos69lmv3.azurecr.io/support-app:latest|acrcarlos69lmv3.azurecr.io/support-app:${{ github.sha }}|g' k8s/deployment.yaml
-          # Inyectar contraseña real
           sed -i 's|TuPasswordSeguro123|${{ secrets.DB_PASSWORD }}|g' k8s/deployment.yaml
 
           kubectl apply -f k8s/
           kubectl rollout status deployment/support-app --timeout=180s
 
-      # 4. Sincronización con API Management (APIM)
+      # ============================================================
+      # PASO 5: ACTUALIZAR APIM CON LA IP DEL INGRESS
+      # ============================================================
       - name: Sync NGINX IP with APIM
         run: |
           echo "Buscando IP del controlador NGINX..."
@@ -244,12 +239,7 @@ jobs:
             sleep 15
           done
 
-          if [ -z "$NGINX_IP" ]; then 
-            echo "Error: No se obtuvo IP del Ingress."
-            exit 1 
-          fi
-
-          echo "IP Detectada: $NGINX_IP. Actualizando backend en APIM..."
+          if [ -z "$NGINX_IP" ]; then exit 1; fi
 
           az apim api update \
             --resource-group rg-k8s-lab \
@@ -257,4 +247,4 @@ jobs:
             --api-id tickets-api \
             --service-url "http://$NGINX_IP"
           
-          echo "Despliegue de Carlos Tapia completado con éxito."
+          echo "¡Misión completada Carlos! Todo arriba."
