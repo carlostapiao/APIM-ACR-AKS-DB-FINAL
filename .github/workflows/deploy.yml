@@ -62,7 +62,7 @@ jobs:
                         fecha_creacion DATETIME DEFAULT GETDATE()
                      );"
 
-      # 3. Preparar Imagen de Aplicación
+      # 3. Preparar Imagen de Aplicación abcdf
       - name: Login to ACR
         uses: azure/docker-login@v1
         with:
@@ -115,4 +115,3 @@ jobs:
             --service-url "http://$NGINX_IP"
           
           echo "Despliegue de Carlos Tapia completado con éxito."
-
