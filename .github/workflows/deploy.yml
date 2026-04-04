@@ -60,7 +60,7 @@ jobs:
       # 3. Kubernetes
       - name: Get AKS Context
         run: |
-          az aks get-credentials --resource-group rg-k8s-lab --name aks-labv3 --overwrite-existing
+          az aks get-credentials --resource-group rg-k8s-lab --name aks-lab --overwrite-existing
 
       - name: Kubernetes Deploy
         run: |
