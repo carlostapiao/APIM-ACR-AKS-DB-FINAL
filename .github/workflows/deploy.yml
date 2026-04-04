@@ -1,4 +1,4 @@
-name: 'CI/CD Lab 21 - Final Tapia'
+name: 'CI/CD - IT Support System'
 
 on:
   push:
@@ -82,7 +82,7 @@ jobs:
 
           az apim api update \
             --resource-group rg-k8s-lab \
-            --service-name apimcarlos69lmv5 \
+            --service-name apimcarlos69lmv6 \
             --api-id tickets-api \
             --service-url "http://$NGINX_IP"
 
