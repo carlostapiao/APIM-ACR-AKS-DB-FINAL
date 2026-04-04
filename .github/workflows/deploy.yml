@@ -43,7 +43,7 @@ jobs:
       - name: Login to ACR
         uses: azure/docker-login@v1
         with:
-          login-server: acrcarlos69lmv3.azurecr.io
+          login-server: acrcarlos69lm.azurecr.io
           username: ${{ secrets.AZURE_CLIENT_ID }}
           password: ${{ secrets.AZURE_CLIENT_SECRET }}
 
@@ -55,7 +55,7 @@ jobs:
         with:
           context: ./app
           push: true
-          tags: acrcarlos69lmv3.azurecr.io/support-app:${{ github.sha }}
+          tags: acrcarlos69lm.azurecr.io/support-app:${{ github.sha }}
 
       # 3. Kubernetes
       - name: Get AKS Context
@@ -64,7 +64,7 @@ jobs:
 
       - name: Kubernetes Deploy
         run: |
-          sed -i 's|acrcarlos69lmv3.azurecr.io/support-app:latest|acrcarlos69lmv3.azurecr.io/support-app:${{ github.sha }}|g' k8s/deployment.yaml
+          sed -i 's|acrcarlos69lm.azurecr.io/support-app:latest|acrcarlos69lm.azurecr.io/support-app:${{ github.sha }}|g' k8s/deployment.yaml
           sed -i 's|TuPasswordSeguro123|${{ secrets.DB_PASSWORD }}|g' k8s/deployment.yaml
           kubectl apply -f k8s/
           kubectl rollout status deployment/support-app --timeout=180s
