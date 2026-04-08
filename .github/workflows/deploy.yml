@@ -82,7 +82,7 @@ jobs:
 
           az apim api update \
             --resource-group rg-k8s-lab \
-            --service-name apimcarlos69lm10 \
+            --service-name apimcarlos69lmV12 \
             --api-id tickets-api \
             --service-url "http://$NGINX_IP"
 
