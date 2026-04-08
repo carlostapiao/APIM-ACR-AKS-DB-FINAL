@@ -19,7 +19,7 @@ variable "aks_name" {
 }
 
 variable "apim_name" {
-  default = "apimcarlos69lmv7"
+  default = "apimcarlos69lmv10"
 }
 
 variable "sql_server_name" {
